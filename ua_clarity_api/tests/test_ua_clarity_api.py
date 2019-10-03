@@ -5,14 +5,14 @@ import requests
 from nose.tools import raises
 from jinja2 import Template
 from bs4 import BeautifulSoup
-from uagc_tools.gls import clarity_api
+from ua_clarity_api import ua_clarity_api
 
 
 class TestUAClarityApi(TestCase):
     def setUp(self):
         with open("dev_lims_creds.json", "r") as file:
             creds = json.loads(file.read())
-        self.api = clarity_api.ClarityApi(
+        self.api = ua_clarity_api.ClarityApi(
             creds["host"], creds["username"], creds["password"])
 
     def test_get_normal_case(self):
