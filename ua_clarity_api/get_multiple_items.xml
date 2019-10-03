@@ -1,0 +1,5 @@
+<{{ resource }}>
+    {% for content in contents %}
+        {{ content }}
+    {% endfor %}
+</{{ resource }}>

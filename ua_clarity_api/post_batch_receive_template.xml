@@ -1,0 +1,6 @@
+<ri:links xmlns:ri="http://genologics.com/ri">
+    {% for url in urls %}
+        <link uri="{{ url }}" rel="{{ resource }}"/>
+    {% endfor %}
+
+</ri:links>

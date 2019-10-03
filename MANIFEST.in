@@ -1,0 +1,2 @@
+include ua_clarity_api/post_batch_receive_template.xml
+include ua_clarity_api/get_multiple_items.xml
