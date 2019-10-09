@@ -4,7 +4,8 @@ import os
 import tempfile
 import urllib
 import json
-from functools import lru_cache
+import concurrent.futures
+import asyncio
 import requests
 from bs4 import BeautifulSoup
 from jinja2 import Template
@@ -15,10 +16,6 @@ from uagc_tools.gls import get_endpoint_map
 class ClarityApi:
     """Contains basic Clarity REST API functionality from CLI or EPP calls."""
     def __init__(self, host, username, password):
-        # NOTE: Saving credentials locally may not be an appropriate
-            # security measure for your organization. If that is the case,
-            # create a subclass of ClarityApi and overwrite this __init__
-            # method.
         self.host = host
         self.username = username
         self.password = password
@@ -32,7 +29,8 @@ class ClarityApi:
                 or a list of them. endpoint's can be both the full endpoint, or
                 just the endpoint after v2/.
             parameters (dict):
-                A mapping of a query-able name: value.
+                A mapping of a query-able name: value. NOTE: queries can only
+                be added to a single endpoint.
             get_all (bool):
                 If there are next-page tags on that resource, whether get
                 should return all of the resources on all pages or just the
@@ -43,11 +41,6 @@ class ClarityApi:
                 The aggregate xml for the get, including all provided
                 endpoint's and queries as a well-formed xml string.
         """
-        query = None
-        # Build endpoint query if a dict is given.
-        if parameters:
-            query = _query_builder(parameters)
-
         # If the endpoints is a str of one endpoint, turn it into a list.
         if isinstance(endpoints, str):
             endpoints = [endpoints]
@@ -56,6 +49,11 @@ class ClarityApi:
         for i, endpoint in enumerate(endpoints):
             if self.host not in endpoint:
                 endpoints[i] = f"{self.host}{endpoint}"
+
+        # Build endpoint with query if a parameters dict is given.
+        if parameters:
+            query = _query_builder(parameters)
+            endpoints[0] += query
 
         batchable = _is_batchable(endpoints)
 
@@ -67,6 +65,9 @@ class ClarityApi:
                 resource = get_endpoint_map.get_pattern_resource.get(key)
         if resource is None:
             raise KeyError(f"The endpoint {endpoints[0]} is not gettable.")
+
+        template_path = os.path.join(
+            os.path.split(__file__)[0], "get_multiple_items.xml")
 
         # Batch get.
         if batchable:
@@ -83,33 +84,29 @@ class ClarityApi:
 
             return self.post(batch_endpoint, post_xml)
 
+        # Brute batch get.
+        elif len(endpoints) > 1:
+            responses = self._brute_batch_get(endpoints)
+            contents = list()
+            for response in responses:
+                contents.append(response.text)
+
+        # Single get.
         else:
+            if get_all:
+                contents = self._harvest_all_resource(
+                    endpoints[0], resource, list())
 
-            template_path = os.path.join(
-                os.path.split(__file__)[0], "get_multiple_items.xml")
-
-            # Brute batch get.
-            if len(endpoints) > 1:
-                contents = list()
-                for endpoint in endpoints:
-                    contents.append(self._cache_get(endpoint))
-
-            # Single get.
             else:
-                if query:
-                    endpoints[0] += query
+                response = requests.get(
+                    endpoints[0], auth=(self.username, self.password))
+                response.raise_for_status()
+                return response.text
 
-                if get_all:
-                    contents = self._harvest_all_resource(
-                        endpoints[0], resource, list())
-
-                else:
-                    return self._cache_get(endpoints[0])
-
-            with open(template_path, 'r') as file:
-                template = Template(file.read())
-                get_xml = template.render(
-                    contents=contents, resource=resource)
+        with open(template_path, 'r') as file:
+            template = Template(file.read())
+            get_xml = template.render(
+                contents=contents, resource=resource)
 
         return get_xml
 
@@ -200,7 +197,8 @@ class ClarityApi:
         # Create a dict of file_uris to their file contents.
         uris_file_content = dict()
         for uri in file_uris:
-            response = _cache_get(f"{uri}/download")
+            response = requests.get(
+                f"{uri}/download", auth=(self.username, self.password))
             response.raise_for_status()
             uris_file_content[uri] = response.content
 
@@ -217,8 +215,11 @@ class ClarityApi:
     def _harvest_all_resource(self, next_page_uri, resource, contents):
         """Recursively harvests all resources from next-page'd get requests."""
         if next_page_uri:
-            response_soup = BeautifulSoup(
-                self._cache_get(next_page_uri), "xml")
+            response = requests.get(
+                next_page_uri, auth=(self.username, self.password))
+            response.raise_for_status()
+
+            response_soup = BeautifulSoup(response.text, "xml")
             contents.extend(response_soup.find_all(resource))
             next_page_tag = response_soup.find("next-page")
 
@@ -233,12 +234,49 @@ class ClarityApi:
         else:
             return contents
 
-    @lru_cache(maxsize=None)
-    def _cache_get(self, url):
-        """Gets url's using a cache, so repeat gets are more efficient."""
-        response = requests.get(url, auth=(self.username, self.password))
-        response.raise_for_status()
-        return response.text
+    def _brute_batch_get(self, urls):
+        """Uses threading to GET a list of urls and returns the responses.
+
+        Arguments:
+            uris (list):
+                A list of complete urls.
+
+        Return:
+            responses (list):
+                List of requests response objects.
+        """
+        # Setup event loop for async calls.
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+        # Execute calls and get responses.
+        responses = loop.run_until_complete(self._get_async(urls))
+
+        return responses
+
+    async def _get_async(self, urls):
+        """Uses ThreadPoolExecutor to GET the list of uris.
+
+        Arguments:
+            uris (list):
+                A list of completed uris to make using requests.
+        Return:
+            A list containing the HTTP responses as dictionaries.
+        """
+        # Set up executor.
+        with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
+            loop = asyncio.get_event_loop()
+            get_auth = (self.username, self.password)
+
+            # Store futures to gather.
+            futures = [
+                loop.run_in_executor(
+                    executor,
+                    lambda: requests.get(url, auth=get_auth)) for url in urls
+            ]
+
+            # Return data when completed.
+            return await asyncio.gather(*futures)
 
 
 def _is_batchable(urls):
