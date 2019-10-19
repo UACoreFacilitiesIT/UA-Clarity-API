@@ -1,6 +1,7 @@
 import tempfile
 import json
 from unittest import TestCase
+from datetime import datetime
 import requests
 from nose.tools import raises
 from jinja2 import Template
@@ -15,12 +16,74 @@ class TestUAClarityApi(TestCase):
         self.api = ua_clarity_api.ClarityApi(
             creds["host"], creds["username"], creds["password"])
 
-    def test_get_normal_case(self):
-        con_uri = self._post_container()
+    def test_get_batch_resource_single_container(self):
+        post_con_uri = self._post_container()
 
-        get_response = self.api.get(con_uri)
+        get_batch_response = self.api.get([post_con_uri])
+        get_batch_soup = BeautifulSoup(get_batch_response, "xml")
+        get_batch_uri = get_batch_soup.find("con:container")["uri"]
+
+        assert post_con_uri == get_batch_uri
+
+    def test_get_multiple_uris_faster_with_multithread(self):
+        get_response = requests.get(
+            f"{self.api.host}configuration/udfs",
+            auth=(self.api.username, self.api.password),
+            timeout=10)
+        get_response_soup = BeautifulSoup(get_response.text, "xml")
+        conf_uris = [
+            soup["uri"] for soup in get_response_soup.find_all("udfconfig")]
+        conf_uris = conf_uris[:20]
+        single_thread_time = datetime.now()
+        for uri in conf_uris:
+            requests.get(
+                f"{self.api.host}configuration/udfs",
+                auth=(self.api.username, self.api.password),
+                timeout=10)
+        single_thread_time = datetime.now() - single_thread_time
+
+        multi_thread_time = datetime.now()
+        self.api.get(conf_uris)
+        multi_thread_time = datetime.now() - multi_thread_time
+
+        assert single_thread_time > multi_thread_time
+
+    def test_get_multiple_uris_larger_than_thread_pool(self):
+        get_response = requests.get(
+            f"{self.api.host}configuration/udfs",
+            auth=(self.api.username, self.api.password),
+            timeout=10)
+        get_response_soup = BeautifulSoup(get_response.text, "xml")
+        conf_uris = [
+            soup["uri"] for soup in get_response_soup.find_all("udfconfig")]
+        get_response = self.api.get(conf_uris, get_all=False)
         get_response_soup = BeautifulSoup(get_response, "xml")
-        assert get_response_soup.find("con:container")["uri"] == con_uri
+        response_uris = [
+            soup["uri"] for soup in get_response_soup.find_all("cnf:field")]
+        # Just in case there are < 500 udfconf.
+        assert len(response_uris) > 99
+
+        conf_uris = conf_uris[:100]
+        response_uris = response_uris[:100]
+        assert sorted(response_uris) == sorted(conf_uris)
+
+    def test_get_single_uri_protocol(self):
+        conf_protocol_uri = f"{self.api.host}configuration/protocols"
+        response = self.api.get(conf_protocol_uri)
+        response_soup = BeautifulSoup(response, "xml")
+        protocol_uri = response_soup.find_all("protocol")[0]["uri"]
+
+        protocol_response = self.api.get(protocol_uri)
+        response_soup = BeautifulSoup(protocol_response, "xml")
+        assert response_soup.find("step")["uri"] is not None
+
+    def test_get_with_query(self):
+        con_url = f"{self.api.host}containers"
+        cons_soup = BeautifulSoup(
+            self.api.get(con_url, parameters={"type": "Tube"}), "xml")
+        assert [soup["uri"] for soup in cons_soup.find_all("container")]
+        assert [
+            soup.find("name").text for soup in cons_soup.find_all("container")]
 
     @raises(KeyError)
     def test_get_http_wrong_url(self):
@@ -30,7 +93,9 @@ class TestUAClarityApi(TestCase):
         post_con_uri = self._post_container()
 
         get_response = requests.get(
-            post_con_uri, auth=(self.api.username, self.api.password))
+            post_con_uri,
+            auth=(self.api.username, self.api.password),
+            timeout=10)
         get_soup = BeautifulSoup(get_response.text, "xml")
 
         get_soup.find(
@@ -60,15 +125,6 @@ class TestUAClarityApi(TestCase):
     def test_post_http_wrong_url(self):
         payload = self._get_container_payload()
         self.api.post("test", payload)
-
-    def test_get_batch_resource_normal_case(self):
-        post_con_uri = self._post_container()
-
-        get_batch_response = self.api.get([post_con_uri])
-        get_batch_soup = BeautifulSoup(get_batch_response, "xml")
-        get_batch_uri = get_batch_soup.find("con:container")["uri"]
-
-        assert post_con_uri == get_batch_uri
 
     def test_delete_normal_case(self):
         con_uri = self._post_container()
