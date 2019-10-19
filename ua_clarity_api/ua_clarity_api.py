@@ -3,14 +3,12 @@ import re
 import os
 import tempfile
 import urllib
-import json
 import concurrent.futures
 import asyncio
 import requests
 from bs4 import BeautifulSoup
 from jinja2 import Template
-from ua_stache_api import ua_stache_api
-from uagc_tools.gls import get_endpoint_map
+from ua_clarity_api import get_endpoint_map
 
 
 class ClarityApi:
@@ -50,21 +48,22 @@ class ClarityApi:
             if self.host not in endpoint:
                 endpoints[i] = f"{self.host}{endpoint}"
 
-        # Build endpoint with query if a parameters dict is given.
-        if parameters:
-            query = _query_builder(parameters)
-            endpoints[0] += query
-
-        batchable = _is_batchable(endpoints)
-
-        # Find the resource, located before the '?' and after the last '/'.
+        # Find the resource, located after the last '/'.
         specific_endpoint = endpoints[0].split("v2/")[-1]
+        specific_endpoint = specific_endpoint.strip('/')
         resource = None
         for key in get_endpoint_map.get_pattern_resource:
             if re.search(key, specific_endpoint):
                 resource = get_endpoint_map.get_pattern_resource.get(key)
         if resource is None:
             raise KeyError(f"The endpoint {endpoints[0]} is not gettable.")
+
+        # Build endpoint with query if a parameters dict is given.
+        if parameters:
+            query = _query_builder(parameters)
+            endpoints[0] += query
+
+        batchable = _is_batchable(endpoints)
 
         template_path = os.path.join(
             os.path.split(__file__)[0], "get_multiple_items.xml")
@@ -89,7 +88,8 @@ class ClarityApi:
             responses = self._brute_batch_get(endpoints)
             contents = list()
             for response in responses:
-                contents.append(response.text)
+                response_soup = BeautifulSoup(response.text, "xml")
+                contents.append(response_soup.find(resource))
 
         # Single get.
         else:
@@ -99,14 +99,15 @@ class ClarityApi:
 
             else:
                 response = requests.get(
-                    endpoints[0], auth=(self.username, self.password))
+                    endpoints[0],
+                    auth=(self.username, self.password),
+                    timeout=10)
                 response.raise_for_status()
                 return response.text
 
         with open(template_path, 'r') as file:
             template = Template(file.read())
-            get_xml = template.render(
-                contents=contents, resource=resource)
+            get_xml = template.render(contents=contents)
 
         return get_xml
 
@@ -198,7 +199,9 @@ class ClarityApi:
         uris_file_content = dict()
         for uri in file_uris:
             response = requests.get(
-                f"{uri}/download", auth=(self.username, self.password))
+                f"{uri}/download",
+                auth=(self.username, self.password),
+                timeout=10)
             response.raise_for_status()
             uris_file_content[uri] = response.content
 
@@ -216,7 +219,9 @@ class ClarityApi:
         """Recursively harvests all resources from next-page'd get requests."""
         if next_page_uri:
             response = requests.get(
-                next_page_uri, auth=(self.username, self.password))
+                next_page_uri,
+                auth=(self.username, self.password),
+                timeout=10)
             response.raise_for_status()
 
             response_soup = BeautifulSoup(response.text, "xml")
@@ -263,17 +268,24 @@ class ClarityApi:
         Return:
             A list containing the HTTP responses as dictionaries.
         """
+        def single_get(url):
+            response = requests.get(
+                url, auth=(self.username, self.password), timeout=10)
+            response.raise_for_status()
+            return response
+
         # Set up executor.
-        with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
+        with concurrent.futures.ThreadPoolExecutor() as executor:
             loop = asyncio.get_event_loop()
-            get_auth = (self.username, self.password)
 
             # Store futures to gather.
-            futures = [
-                loop.run_in_executor(
+            futures = list()
+            for url in urls:
+                futures.append(loop.run_in_executor(
                     executor,
-                    lambda: requests.get(url, auth=get_auth)) for url in urls
-            ]
+                    single_get,
+                    url
+                ))
 
             # Return data when completed.
             return await asyncio.gather(*futures)
