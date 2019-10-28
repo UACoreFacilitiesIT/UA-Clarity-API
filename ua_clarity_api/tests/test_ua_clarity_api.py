@@ -207,7 +207,9 @@ class TestUAClarityApi(TestCase):
         with open(template_path) as file:
             template = Template(file.read())
             payload = template.render(
-                con_name="Clarity API Container Post Test")
+                con_name="Clarity API Container Post Test",
+                con_type="http://uagc-dev/api/v2/containertypes/1",
+                con_uri="http://uagc-dev/api/v2/containers")
 
         return payload
 

@@ -4,3 +4,4 @@ build/*
 *__pycache__*
 *creds*
 *.ipynb
+tests/dev_lims_creds.json

@@ -1,6 +1,7 @@
 <con:details xmlns:ri="http://genologics.com/ri" xmlns:udf="http://genologics.com/ri/userdefined" xmlns:file="http://genologics.com/ri/file" xmlns:art="http://genologics.com/ri/artifact" xmlns:con="http://genologics.com/ri/container">
-    <con:container uri="http://uagc-dev/api/v2/containers">
+    <con:container uri="{{ con_uri }}">
         <name>{{ con_name }}</name>
-        <type uri="http://uagc-dev/api/v2/containertypes/1" name="96 well plate"/>
+        <type uri="{{ con_type }}" name="96 well plate"/>
     </con:container>
 </con:details>
+

@@ -173,7 +173,15 @@ class ClarityApi:
         return response.text
 
     def delete(self, full_url):
-        """Delete the uri within Clarity, returning the delete response."""
+        """Delete the uri within Clarity, returning the delete response.
+
+        Arguments:
+            full_url (string): The url to delete from clarity.
+
+        Returns:
+            (response): The response from the requests library deleting the
+                endpoint.
+        """
         headers = {"Content-type": "application/xml"}
         response = requests.delete(
             full_url,
