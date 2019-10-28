@@ -3,7 +3,20 @@
 All notable changes to this project can be found here.
 The format of this changelog is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-#### 2019/10/19 [1.0.3](https://github.com/UACoreFacilitiesIT/UA-Clarity-API)
+#### 2019/10/19 [1.1.0](https://github.com/UACoreFacilitiesIT/UA-Clarity-API)
+
+Added a feature to download files by artifact, fixed some get bugs.
+
+##### Fixed
+
+- Fixed bug in get where pages without a next page would sometimes throw an error.
+
+##### Added
+
+- If an empty list is passed to get, an empty list will be returned.
+- Enabled files to get retrieved with either artifact uri's or file uri's.
+
+#### 2019/10/19 [1.0.3](https://github.com/UACoreFacilitiesIT/UA-Clarity-API/commit/fa9fd2b9610c14133c056d4c02ca2fbb4076d6bd)
 
 There were some critical errors with the brute-batch-get function, so those have been fixed.
 

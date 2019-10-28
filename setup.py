@@ -10,7 +10,7 @@ def readme(filename):
 
 setup(
     name="ua_clarity_api",
-    version="1.0.3",
+    version="1.1.0",
     packages=find_packages(),
     author="Stephen Stern, Rafael Lopez",
     author_email="sterns1@email.arizona.edu",

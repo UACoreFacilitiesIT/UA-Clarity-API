@@ -39,6 +39,8 @@ class ClarityApi:
                 The aggregate xml for the get, including all provided
                 endpoint's and queries as a well-formed xml string.
         """
+        if not endpoints:
+            return endpoints
         # If the endpoints is a str of one endpoint, turn it into a list.
         if isinstance(endpoints, str):
             endpoints = [endpoints]
@@ -93,16 +95,19 @@ class ClarityApi:
 
         # Single get.
         else:
-            if get_all:
+            response = requests.get(
+                endpoints[0],
+                auth=(self.username, self.password),
+                timeout=10)
+            response.raise_for_status()
+            response_soup = BeautifulSoup(response.text, "xml")
+            next_page_tag = response_soup.find("next-page")
+
+            if get_all and next_page_tag:
                 contents = self._harvest_all_resource(
                     endpoints[0], resource, list())
 
             else:
-                response = requests.get(
-                    endpoints[0],
-                    auth=(self.username, self.password),
-                    timeout=10)
-                response.raise_for_status()
                 return response.text
 
         with open(template_path, 'r') as file:
@@ -178,17 +183,41 @@ class ClarityApi:
 
         return response
 
-    def download_files(self, file_uris):
+    def download_files(self, uris, file_key=True):
         """Retrieves files from Clarity server, returns as uri:tempfile dict.
 
         Arguments:
             file_uris (list):
-                The list of desired file_uri's.
+                The list of desired file_uri's (or artifact uri's that contain
+                    a 'file:file' tag, with a limsid that starts with '92-').
+            file_key (boolean):
+                If True, the key will be a file uri. If False, the key will be
+                    an artifact uri.
 
         Returns:
             uris_files (dict):
-                file_uris: unencoded tempfile.
+                file_uris or art_uris: unencoded tempfile.
         """
+        # Harvest the file uri from the art uri, and map the two if file_key is
+        # False.
+        art_uris = set()
+        for uri in uris:
+            if "artifacts/" in uri or uri.split('/')[-1].startswith("92-"):
+                art_uris.add(uri)
+
+        if art_uris:
+            file_art_uris = dict()
+            arts_soup = BeautifulSoup(self.get(list(art_uris)), "xml")
+            for soup in arts_soup.find_all("art:artifact"):
+                # If an artifact has not yet been given a file uri, continue.
+                if soup.find("file:file"):
+                    file_art_uris[soup.find("file:file")["uri"]] = soup[
+                        "uri"].split('?')[0]
+
+            file_uris = file_art_uris.keys()
+        else:
+            file_uris = uris
+
         file_uri_check = ["file" in uri for uri in file_uris]
         # Assert uris are batchable, there's only 1 resource, and the uri's
         #  are file uri's.
@@ -197,13 +226,17 @@ class ClarityApi:
 
         # Create a dict of file_uris to their file contents.
         uris_file_content = dict()
-        for uri in file_uris:
+        for file_uri in file_uris:
             response = requests.get(
-                f"{uri}/download",
+                f"{file_uri}/download",
                 auth=(self.username, self.password),
                 timeout=10)
             response.raise_for_status()
-            uris_file_content[uri] = response.content
+
+            if file_key:
+                uris_file_content[file_uri] = response.content
+            else:
+                uris_file_content[file_art_uris[file_uri]] = response.content
 
         # For each file uri, create a tempfile, write their contents into it,
         # and map the tempfile to the uri.

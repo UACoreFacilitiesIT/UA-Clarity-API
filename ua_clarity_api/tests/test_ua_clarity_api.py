@@ -1,3 +1,4 @@
+import os
 import tempfile
 import json
 from unittest import TestCase
@@ -11,7 +12,9 @@ from ua_clarity_api import ua_clarity_api
 
 class TestUAClarityApi(TestCase):
     def setUp(self):
-        with open("dev_lims_creds.json", "r") as file:
+        creds_path = (os.path.join(
+            os.path.split(__file__)[0], "dev_lims_creds.json"))
+        with open(creds_path, "r") as file:
             creds = json.loads(file.read())
         self.api = ua_clarity_api.ClarityApi(
             creds["host"], creds["username"], creds["password"])
@@ -85,6 +88,21 @@ class TestUAClarityApi(TestCase):
         assert [
             soup.find("name").text for soup in cons_soup.find_all("container")]
 
+    def test_get_all_false(self):
+        con_url = f"{self.api.host}containers"
+        con_soup = BeautifulSoup(
+            self.api.get(con_url, get_all=False), "xml")
+        con_uris = [soup["uri"] for soup in con_soup.find_all("container")]
+        assert con_uris
+        assert len(con_uris) <= 500
+
+    def test_get_all_false_no_next_page(self):
+        perm_url = f"{self.api.host}permissions"
+        perm_soup = BeautifulSoup(
+            self.api.get(perm_url, get_all=False), "xml")
+        perm_uris = [soup["uri"] for soup in perm_soup.find_all("permission")]
+        assert perm_uris
+
     @raises(KeyError)
     def test_get_http_wrong_url(self):
         self.api.get("test")
@@ -134,7 +152,7 @@ class TestUAClarityApi(TestCase):
     def test_delete_not_real_uri(self):
         self.api.delete("http://uagc-dev.claritylims.com/not-a-uri")
 
-    def test_download_files(self):
+    def test_download_files_file_uris(self):
         files_list_response = self.api.get(f"{self.api.host}files/")
         files_list_soup = BeautifulSoup(files_list_response, "xml")
         file_uris = [tag["uri"] for tag in files_list_soup.find_all("file")]
@@ -147,11 +165,34 @@ class TestUAClarityApi(TestCase):
             for value in results.values():
                 assert isinstance(value, tempfile._TemporaryFileWrapper)
 
+    def test_download_files_art_uris(self):
+        arts_response = self.api.get(
+            f"{self.api.host}artifacts/", parameters={"type": "ResultFile"})
+        arts_soup = BeautifulSoup(arts_response, "xml")
+        all_art_uris = [tag["uri"] for tag in arts_soup.find_all("artifact")]
+
+        if all_art_uris:
+            all_art_uris = all_art_uris[:3]
+            art_soups = BeautifulSoup(self.api.get(all_art_uris), "xml")
+            scrubbed_art_uris = list()
+            for soup in art_soups.find_all("art:artifact"):
+                if soup.find("file:file"):
+                    scrubbed_art_uris.append(soup["uri"].split('?')[0])
+
+            results = self.api.download_files(
+                scrubbed_art_uris, file_key=False)
+
+            assert sorted(list(results.keys())) == sorted(scrubbed_art_uris)
+            no_file_uris = set(all_art_uris).difference(set(scrubbed_art_uris))
+            assert [uri not in results.keys() for uri in no_file_uris]
+            for value in results.values():
+                assert isinstance(value, tempfile._TemporaryFileWrapper)
+
         else:
             raise RuntimeError(
-                "There are no files in the Clarity Dev environment. Please"
-                " manually attach a file in Clarity and then attempt this test"
-                " again.")
+                "There are no file artifacts in the Clarity Dev environment."
+                "Please manually attach a file in Clarity and then attempt"
+                " this test again.")
 
     @raises(ValueError)
     def test_get_batch_resource_two_types_uris(self):
@@ -161,7 +202,9 @@ class TestUAClarityApi(TestCase):
 
     def _get_container_payload(self):
         """Return a test container payload."""
-        with open("post_container_template.xml") as file:
+        template_path = (os.path.join(
+            os.path.split(__file__)[0], "post_container_template.xml"))
+        with open(template_path) as file:
             template = Template(file.read())
             payload = template.render(
                 con_name="Clarity API Container Post Test")
