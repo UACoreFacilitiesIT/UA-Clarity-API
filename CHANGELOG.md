@@ -3,7 +3,11 @@
 All notable changes to this project can be found here.
 The format of this changelog is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-#### 2019/10/19 [1.1.0](https://github.com/UACoreFacilitiesIT/UA-Clarity-API)
+#### 2019/11/27 [1.1.2](https://github.com/UACoreFacilitiesIT/UA-Clarity-API)
+
+Clarity Api now extends UA-Generic-Rest-API. Host URLs are no longer hard-coded. 1.1.1 had merge conflicts, so it was updated to 1.1.2.
+
+#### 2019/11/15 [1.1.0](https://github.com/UACoreFacilitiesIT/UA-Clarity-API/commit/37ba54bee86aff7350a8330f3567f1fda8053fa8)
 
 Added a feature to download files by artifact, fixed some get bugs.
 

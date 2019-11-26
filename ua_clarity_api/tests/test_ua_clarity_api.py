@@ -10,14 +10,18 @@ from bs4 import BeautifulSoup
 from ua_clarity_api import ua_clarity_api
 
 
-class TestUAClarityApi(TestCase):
+class TestClarityApi(TestCase):
     def setUp(self):
         creds_path = (os.path.join(
             os.path.split(__file__)[0], "dev_lims_creds.json"))
         with open(creds_path, "r") as file:
             creds = json.loads(file.read())
+
+        self.username = creds["username"]
+        self.password = creds["password"]
+
         self.api = ua_clarity_api.ClarityApi(
-            creds["host"], creds["username"], creds["password"])
+            creds["host"], self.username, self.password)
 
     def test_get_batch_resource_single_container(self):
         post_con_uri = self._post_container()
@@ -31,7 +35,7 @@ class TestUAClarityApi(TestCase):
     def test_get_multiple_uris_faster_with_multithread(self):
         get_response = requests.get(
             f"{self.api.host}configuration/udfs",
-            auth=(self.api.username, self.api.password),
+            auth=(self.username, self.password),
             timeout=10)
         get_response_soup = BeautifulSoup(get_response.text, "xml")
         conf_uris = [
@@ -41,7 +45,7 @@ class TestUAClarityApi(TestCase):
         for uri in conf_uris:
             requests.get(
                 f"{self.api.host}configuration/udfs",
-                auth=(self.api.username, self.api.password),
+                auth=(self.username, self.password),
                 timeout=10)
         single_thread_time = datetime.now() - single_thread_time
 
@@ -54,7 +58,7 @@ class TestUAClarityApi(TestCase):
     def test_get_multiple_uris_larger_than_thread_pool(self):
         get_response = requests.get(
             f"{self.api.host}configuration/udfs",
-            auth=(self.api.username, self.api.password),
+            auth=(self.username, self.password),
             timeout=10)
         get_response_soup = BeautifulSoup(get_response.text, "xml")
         conf_uris = [
@@ -90,8 +94,8 @@ class TestUAClarityApi(TestCase):
 
     def test_get_all_false(self):
         con_url = f"{self.api.host}containers"
-        con_soup = BeautifulSoup(
-            self.api.get(con_url, get_all=False), "xml")
+        get_responses = self.api.get(con_url, get_all=False)
+        con_soup = BeautifulSoup(get_responses, "xml")
         con_uris = [soup["uri"] for soup in con_soup.find_all("container")]
         assert con_uris
         assert len(con_uris) <= 500
@@ -112,7 +116,7 @@ class TestUAClarityApi(TestCase):
 
         get_response = requests.get(
             post_con_uri,
-            auth=(self.api.username, self.api.password),
+            auth=(self.username, self.password),
             timeout=10)
         get_soup = BeautifulSoup(get_response.text, "xml")
 
@@ -150,10 +154,11 @@ class TestUAClarityApi(TestCase):
 
     @raises(requests.exceptions.HTTPError)
     def test_delete_not_real_uri(self):
-        self.api.delete("http://uagc-dev.claritylims.com/not-a-uri")
+        self.api.delete(f"{self.api.host}not-a-uri")
 
     def test_download_files_file_uris(self):
-        files_list_response = self.api.get(f"{self.api.host}files/")
+        files_list_response = self.api.get(
+            f"{self.api.host}files/", get_all=False)
         files_list_soup = BeautifulSoup(files_list_response, "xml")
         file_uris = [tag["uri"] for tag in files_list_soup.find_all("file")]
 
@@ -167,7 +172,9 @@ class TestUAClarityApi(TestCase):
 
     def test_download_files_art_uris(self):
         arts_response = self.api.get(
-            f"{self.api.host}artifacts/", parameters={"type": "ResultFile"})
+            f"{self.api.host}artifacts/",
+            parameters={"type": "ResultFile"},
+            get_all=False)
         arts_soup = BeautifulSoup(arts_response, "xml")
         all_art_uris = [tag["uri"] for tag in arts_soup.find_all("artifact")]
 
@@ -175,9 +182,9 @@ class TestUAClarityApi(TestCase):
             all_art_uris = all_art_uris[:3]
             art_soups = BeautifulSoup(self.api.get(all_art_uris), "xml")
             scrubbed_art_uris = list()
-            for soup in art_soups.find_all("art:artifact"):
-                if soup.find("file:file"):
-                    scrubbed_art_uris.append(soup["uri"].split('?')[0])
+            for art_soup in art_soups.find_all("art:artifact"):
+                if art_soup.find("file:file"):
+                    scrubbed_art_uris.append(art_soup["uri"].split('?')[0])
 
             results = self.api.download_files(
                 scrubbed_art_uris, file_key=False)
@@ -208,8 +215,8 @@ class TestUAClarityApi(TestCase):
             template = Template(file.read())
             payload = template.render(
                 con_name="Clarity API Container Post Test",
-                con_type="http://uagc-dev/api/v2/containertypes/1",
-                con_uri="http://uagc-dev/api/v2/containers")
+                con_endpoint=f"{self.api.host}containers",
+                type_uri=f"{self.api.host}containertypes/1")
 
         return payload
 
@@ -221,7 +228,7 @@ class TestUAClarityApi(TestCase):
         response = requests.post(
             f"{self.api.host}containers/batch/create",
             payload,
-            auth=(self.api.username, self.api.password),
+            auth=(self.username, self.password),
             headers=headers)
 
         response.raise_for_status()
