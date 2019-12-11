@@ -171,35 +171,38 @@ class TestClarityApi(TestCase):
                 assert isinstance(value, tempfile._TemporaryFileWrapper)
 
     def test_download_files_art_uris(self):
+        # NOTE: If the test takes too long, feel free to add in get_all=False
+        # to this get.
         arts_response = self.api.get(
             f"{self.api.host}artifacts/",
-            parameters={"type": "ResultFile"},
-            get_all=False)
+            parameters={"type": "ResultFile"})
         arts_soup = BeautifulSoup(arts_response, "xml")
         all_art_uris = [tag["uri"] for tag in arts_soup.find_all("artifact")]
 
         if all_art_uris:
-            all_art_uris = all_art_uris[:3]
             art_soups = BeautifulSoup(self.api.get(all_art_uris), "xml")
             scrubbed_art_uris = list()
             for art_soup in art_soups.find_all("art:artifact"):
                 if art_soup.find("file:file"):
                     scrubbed_art_uris.append(art_soup["uri"].split('?')[0])
 
-            results = self.api.download_files(
-                scrubbed_art_uris, file_key=False)
+            if scrubbed_art_uris:
+                results = self.api.download_files(
+                    scrubbed_art_uris, file_key=False)
 
-            assert sorted(list(results.keys())) == sorted(scrubbed_art_uris)
-            no_file_uris = set(all_art_uris).difference(set(scrubbed_art_uris))
-            assert [uri not in results.keys() for uri in no_file_uris]
-            for value in results.values():
-                assert isinstance(value, tempfile._TemporaryFileWrapper)
+                assert sorted(list(results.keys())) == sorted(
+                    scrubbed_art_uris)
+                no_file_uris = set(all_art_uris).difference(
+                    set(scrubbed_art_uris))
+                assert [uri not in results.keys() for uri in no_file_uris]
+                for value in results.values():
+                    assert isinstance(value, tempfile._TemporaryFileWrapper)
+                return
 
-        else:
-            raise RuntimeError(
-                "There are no file artifacts in the Clarity Dev environment."
-                "Please manually attach a file in Clarity and then attempt"
-                " this test again.")
+        raise RuntimeError(
+            "There are no file artifacts in the Clarity Dev environment with"
+            " files attached. Please manually attach a file in Clarity and"
+            " then attempt this test again.")
 
     @raises(ValueError)
     def test_get_batch_resource_two_types_uris(self):

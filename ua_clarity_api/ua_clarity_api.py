@@ -155,7 +155,7 @@ class ClarityApi(ua_generic_rest_api.GenericRestApi):
     def _harvest_all_resource(self, next_page_uri, resource, contents):
         """Recursively harvests all resources from next-page'd get requests."""
         if next_page_uri:
-            response = self.session.get(next_page_uri, timeout=10)
+            response = self.session.get(next_page_uri, timeout=60)
             response.raise_for_status()
 
             response_soup = BeautifulSoup(response.text, "xml")

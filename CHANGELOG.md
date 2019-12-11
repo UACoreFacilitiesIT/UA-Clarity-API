@@ -3,7 +3,16 @@
 All notable changes to this project can be found here.
 The format of this changelog is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-#### 2019/11/27 [1.1.2](https://github.com/UACoreFacilitiesIT/UA-Clarity-API)
+#### 2019/12/11 [1.1.3](https://github.com/UACoreFacilitiesIT/UA-Clarity-API)
+
+The Clarity server seems to timeout on certain get calls, so that timeout has been extended. Made a test less brittle.
+
+##### Fixed
+
+- Fixed bug in get where Clarity was taking longer than 10s to return a get. Now the timeout is 60s.
+- Made the download_files test with artifact uri's less brittle. If that test takes too long to run in your test environment, take the added NOTE's suggestion.
+
+#### 2019/11/27 [1.1.2](https://github.com/UACoreFacilitiesIT/UA-Clarity-API/commit/95d0a4f9c8fda5884e1bb25134c08e826ee18464)
 
 Clarity Api now extends UA-Generic-Rest-API. Host URLs are no longer hard-coded. 1.1.1 had merge conflicts, so it was updated to 1.1.2.
 
