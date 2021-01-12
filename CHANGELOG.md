@@ -3,6 +3,12 @@
 All notable changes to this project can be found here.
 The format of this changelog is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+#### 2021/1/12 [1.1.4](https://github.com/UACoreFacilitiesIT/UA-Clarity-API)
+
+Updated setup.py dependencies to be more explicit and contain every dependency.
+
+- Previously some dependencies were not listed, but were assumed to be installed through other packages.
+
 #### 2019/12/11 [1.1.3](https://github.com/UACoreFacilitiesIT/UA-Clarity-API)
 
 The Clarity server seems to timeout on certain get calls, so that timeout has been extended. Made a test less brittle.

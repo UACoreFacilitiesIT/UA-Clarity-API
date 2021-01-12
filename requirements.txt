@@ -1,0 +1,4 @@
+ua-generic-rest-api
+jinja2
+bs4
+lxml

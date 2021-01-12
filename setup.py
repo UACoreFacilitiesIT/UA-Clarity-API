@@ -10,7 +10,7 @@ def readme(filename):
 
 setup(
     name="ua_clarity_api",
-    version="1.1.3",
+    version="1.1.4",
     packages=find_packages(),
     author="Stephen Stern, Rafael Lopez",
     author_email="sterns1@email.arizona.edu",
@@ -22,8 +22,11 @@ setup(
     description=(
         "API that interacts with Illumina Clarity LIMS REST architecture."),
     install_requires=[
-        "ua-generic-rest-api"
+        "ua-generic-rest-api",
+        "jinja2",
+        "bs4",
+        "lxml",
     ],
     project_urls={
-        "Clarity REST Documentation": "https://www.genologics.com/developer/"}
+        "Clarity REST Documentation": "https://www.genologics.com/developer/"},
 )
