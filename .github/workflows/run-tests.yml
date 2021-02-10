@@ -34,7 +34,7 @@ jobs:
           pip install .
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
           pip install nose
-          echo '{"host": "${{ secrets.CLARITY_HOST }}", "username": "${{ secrets.CLARITY_USERNAME }}", "password": ${{ secrets.CLARITY_PASSWORD }}"}' > ua_clarity_api/tests/dev_lims_creds.json
+          echo '{"host": "${{ secrets.CLARITY_HOST }}", "username": "${{ secrets.CLARITY_USERNAME }}", "password": "${{ secrets.CLARITY_PASSWORD }}"}' > ua_clarity_api/tests/dev_lims_creds.json
       - name: Run Tests
         run: |
           cd ua_clarity_api/tests
