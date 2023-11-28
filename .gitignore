@@ -5,3 +5,4 @@ build/*
 *creds*
 *.ipynb
 tests/dev_lims_creds.json
+*DS_Store*
