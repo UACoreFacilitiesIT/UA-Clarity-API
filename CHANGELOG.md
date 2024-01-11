@@ -3,17 +3,21 @@
 All notable changes to this project can be found here.
 The format of this changelog is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-#### 2021/1/20 [1.1.5](https://github.com/UACoreFacilitiesIT/UA-Clarity-API)
+#### 2024/1/11 [1.1.6](https://github.com/UACoreFacilitiesIT/UA-Clarity-API/commit/53847a49c932477aeedfa9dc12782e924fc28504)
+
+Adds lxml as a dependency, as we didn't include it in the original Poetry update.
+
+#### 2023/11/28 [1.1.5](https://github.com/UACoreFacilitiesIT/UA-Clarity-API/commit/fe44fb4bfb4174a80a189a585bee15209932fa93)
 
 Updates env management to use poetry.
 
-#### 2021/1/20 [1.1.4](https://github.com/UACoreFacilitiesIT/UA-Clarity-API)
+#### 2021/1/20 [1.1.4](https://github.com/UACoreFacilitiesIT/UA-Clarity-API/commit/643b5af92e221aefcbb76886e461f1cce4c04fd0)
 
 Updated setup.py dependencies to be more explicit and contain every dependency.
 
 - Previously some dependencies were not listed, but were assumed to be installed through other packages.
 
-#### 2019/12/11 [1.1.3](https://github.com/UACoreFacilitiesIT/UA-Clarity-API)
+#### 2019/12/11 [1.1.3](https://github.com/UACoreFacilitiesIT/UA-Clarity-API/commit/ebfd29108a5813fff76e43ef3159934f8d356b85)
 
 The Clarity server seems to timeout on certain get calls, so that timeout has been extended. Made a test less brittle.
 
